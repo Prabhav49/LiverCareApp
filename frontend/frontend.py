@@ -105,7 +105,7 @@ def index():
                 }
                 
                 # Make API request to the backend
-                response = requests.post('http://backend:8000/predict', json=payload)
+                response = requests.post('http://192.168.49.2:31562/predict', json=payload)
                 
                 if response.status_code == 200:
                     prediction_result = response.json()
@@ -158,7 +158,7 @@ def api_predict():
         if isinstance(data['gender'], str):
             data['gender'] = int(data['gender'])
             
-        response = requests.post('http://backend:8000/predict', json=data)
+        response = requests.post('http://192.168.49.2:31562/predict', json=data)
         return jsonify(response.json()), response.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
