@@ -84,7 +84,7 @@ apiVersion: v1
 kind: Config
 clusters:
 - cluster:
-    server: https://your-k8s-cluster-url
+    server: https://192.168.49.2:8443
     insecure-skip-tls-verify: true
   name: k8s-cluster
 contexts:
