@@ -1,7 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import numpy as np
-import pandas as pd
 import pickle
 import os
 
@@ -32,6 +31,7 @@ class PatientData(BaseModel):
 @app.post("/predict")
 async def predict(data: PatientData):
     try:
+        # Prepare the input values as a numpy array
         input_values = [
             data.age,
             data.gender,
@@ -47,11 +47,10 @@ async def predict(data: PatientData):
         
         input_array = np.array(input_values).reshape(1, -1)
         
-        scaled_data = (input_array - model['mean']) / model['std']
-        pca_data = np.dot(scaled_data, model['eigenvectors'])
-        pca_with_bias = np.c_[np.ones((pca_data.shape[0], 1)), pca_data]
-        probability = 1 / (1 + np.exp(-np.dot(pca_with_bias, model['weights'])))
+        # Assuming the model only has weights and no need for PCA
+        probability = 1 / (1 + np.exp(-np.dot(input_array, model['weights'])))
         
+        # Return the result
         return {
             "probability": float(probability[0][0]),
             "prediction": int(probability[0][0] >= 0.5)
