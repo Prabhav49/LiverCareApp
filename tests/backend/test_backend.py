@@ -1,6 +1,12 @@
 import pytest
+import sys
+import os
 from fastapi.testclient import TestClient
-from backend.src.main import app  # Make sure this path aligns with your project structure
+
+# Ensure the backend/src directory is in the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../backend/src')))
+
+from main import app  # Import the FastAPI app from backend/src/main.py
 
 client = TestClient(app)
 

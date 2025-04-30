@@ -2,7 +2,7 @@ import sys
 import os
 import pytest
 
-# Add the frontend directory to the Python path
+# Add the parent directory of the frontend folder to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../frontend')))
 
 from frontend import app  # This should now work
