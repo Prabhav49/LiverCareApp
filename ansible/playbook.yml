@@ -8,6 +8,9 @@
     kubeconfig_path: "{{ kubeconfig_path | default('./.kube/config') }}"
     manifests_dir: "{{ playbook_dir }}/../k8s-manifests"
 
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
   tasks:
     - name: Verify kubeconfig file exists
       stat:
@@ -30,7 +33,7 @@
       when: not manifests_dir_stat.stat.exists
 
     - name: Validate Kubernetes connection
-      command: "KUBECONFIG={{ kubeconfig_path }} kubectl cluster-info"
+      command: "kubectl cluster-info"
       register: cluster_info
       changed_when: false
       ignore_errors: yes
@@ -41,10 +44,8 @@
       when: cluster_info.rc != 0
 
     - name: Apply Kubernetes Manifests
-      command: "KUBECONFIG={{ kubeconfig_path }} kubectl apply -f {{ manifests_dir }}"
+      command: "kubectl apply -f {{ manifests_dir }}"
       register: apply_result
-      args:
-        warn: false  # Don't continue on error
 
     - name: Verify deployment success
       fail:
