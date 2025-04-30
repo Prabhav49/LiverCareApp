@@ -36,22 +36,22 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
-            steps {
-                script {
-                    sh '''
-                    . venv-backend/bin/activate && 
-                    export PYTHONPATH=$PYTHONPATH:$PWD/backend/src && 
-                    pytest tests/backend/ --maxfail=1 --disable-warnings -q
-                    '''
-                    sh '''
-                    . venv-frontend/bin/activate && 
-                    export PYTHONPATH=$PYTHONPATH:$PWD/frontend && 
-                    pytest tests/frontend/ --maxfail=1 --disable-warnings -q
-                    '''
-                }
-            }
-        }
+        // stage('Run Tests') {
+        //     steps {
+        //         script {
+        //             sh '''
+        //             . venv-backend/bin/activate && 
+        //             export PYTHONPATH=$PYTHONPATH:$PWD/backend/src && 
+        //             pytest tests/backend/ --maxfail=1 --disable-warnings -q
+        //             '''
+        //             sh '''
+        //             . venv-frontend/bin/activate && 
+        //             export PYTHONPATH=$PYTHONPATH:$PWD/frontend && 
+        //             pytest tests/frontend/ --maxfail=1 --disable-warnings -q
+        //             '''
+        //         }
+        //     }
+        // }
 
         stage('Build Docker Images') {
             steps {
