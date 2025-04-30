@@ -5,8 +5,9 @@ pipeline {
         GIT_CREDENTIALS = 'github-cred'
         DOCKER_IMAGE_FRONTEND = 'prabhav49/frontend-app'
         DOCKER_IMAGE_BACKEND = 'prabhav49/backend-app'
-        KUBECONFIG_FILE = credentials('kube-config')  // Should be a File credential
-        KUBECONFIG_PATH = "${WORKSPACE}/.kube/config" // Workspace subdir (safe for writes)
+        KUBECONFIG_FILE = credentials('kube-config')  // File credential
+        KUBECONFIG_PATH = "${WORKSPACE}/.kube/config"
+        MINIKUBE_CERTS_DIR = "${WORKSPACE}/.minikube"
     }
 
     stages {
@@ -70,13 +71,42 @@ pipeline {
             }
         }
 
-        stage('Prepare Kubeconfig') {
+        stage('Prepare Kubeconfig and Certificates') {
             steps {
                 script {
-                    // Ensure .kube directory exists in workspace
-                    sh 'mkdir -p $(dirname "$KUBECONFIG_PATH")'
-                    // Copy securely into workspace instead of /tmp
-                    sh 'cp "$KUBECONFIG_FILE" "$KUBECONFIG_PATH"'
+                    // Create directory structure
+                    sh "mkdir -p ${MINIKUBE_CERTS_DIR}/profiles/minikube"
+                    sh "mkdir -p ${WORKSPACE}/.kube"
+
+                    // Copy and set up certificates using credentials
+                    withCredentials([
+                        file(credentialsId: 'minikube-client-cert', variable: 'CLIENT_CERT'),
+                        file(credentialsId: 'minikube-client-key', variable: 'CLIENT_KEY'),
+                        file(credentialsId: 'minikube-ca', variable: 'CA_CRT'),
+                        file(credentialsId: 'kube-config', variable: 'KUBECONFIG_FILE')
+                    ]) {
+                        // Copy certificates to workspace
+                        sh "cp '$CLIENT_CERT' ${MINIKUBE_CERTS_DIR}/profiles/minikube/client.crt"
+                        sh "cp '$CLIENT_KEY' ${MINIKUBE_CERTS_DIR}/profiles/minikube/client.key"
+                        sh "cp '$CA_CRT' ${MINIKUBE_CERTS_DIR}/ca.crt"
+
+                        // Copy and modify kubeconfig
+                        sh "cp '$KUBECONFIG_FILE' ${KUBECONFIG_PATH}"
+                        sh """
+                        sed -i 's|/home/prabhav/.minikube/profiles/minikube/client.crt|${MINIKUBE_CERTS_DIR}/profiles/minikube/client.crt|g' ${KUBECONFIG_PATH}
+                        sed -i 's|/home/prabhav/.minikube/profiles/minikube/client.key|${MINIKUBE_CERTS_DIR}/profiles/minikube/client.key|g' ${KUBECONFIG_PATH}
+                        sed -i 's|/home/prabhav/.minikube/ca.crt|${MINIKUBE_CERTS_DIR}/ca.crt|g' ${KUBECONFIG_PATH}
+                        """
+                        
+                        // Set secure permissions
+                        sh "chmod 644 ${MINIKUBE_CERTS_DIR}/profiles/minikube/client.crt"
+                        sh "chmod 600 ${MINIKUBE_CERTS_DIR}/profiles/minikube/client.key"
+                        sh "chmod 644 ${MINIKUBE_CERTS_DIR}/ca.crt"
+                        sh "chmod 600 ${KUBECONFIG_PATH}"
+                    }
+
+                    // Verify Kubernetes access
+                    sh "KUBECONFIG=${KUBECONFIG_PATH} kubectl cluster-info"
                 }
             }
         }
@@ -84,7 +114,7 @@ pipeline {
         stage('Deploy using Ansible') {
             steps {
                 script {
-                    sh "ansible-playbook -i localhost, ansible/playbook.yml --extra-vars kubeconfig_path=$KUBECONFIG_PATH"
+                    sh "ansible-playbook -i localhost, ansible/playbook.yml --extra-vars kubeconfig_path=${KUBECONFIG_PATH}"
                 }
             }
         }
