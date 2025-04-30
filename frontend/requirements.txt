@@ -4,3 +4,5 @@ WTForms==3.0.1
 prometheus_client
 pytest
 pytest-cov
+httpx
+
