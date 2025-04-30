@@ -95,57 +95,49 @@ pipeline {
             }
         }
 
-        stage('Prepare Deployment') {
+        stage('Prepare Kubeconfig and Certificates') {
             steps {
                 script {
-                    // Update k8s manifests with new image tags
-                    sh """
-                    sed -i 's|image: ${DOCKER_IMAGE_FRONTEND}:.*|image: ${DOCKER_IMAGE_FRONTEND}:${DOCKER_TAG}|g' k8s-manifests/frontend-deployment.yaml
-                    sed -i 's|image: ${DOCKER_IMAGE_BACKEND}:.*|image: ${DOCKER_IMAGE_BACKEND}:${DOCKER_TAG}|g' k8s-manifests/backend-deployment.yaml
-                    """
-                    
-                    // Prepare kubeconfig
+                    // Create directory structure
                     sh "mkdir -p ${MINIKUBE_CERTS_DIR}/profiles/minikube"
                     sh "mkdir -p ${WORKSPACE}/.kube"
-                    
+
+                    // Copy and set up certificates using credentials
                     withCredentials([
                         file(credentialsId: 'minikube-client-cert', variable: 'CLIENT_CERT'),
                         file(credentialsId: 'minikube-client-key', variable: 'CLIENT_KEY'),
                         file(credentialsId: 'minikube-ca', variable: 'CA_CRT'),
                         file(credentialsId: 'kube-config', variable: 'KUBECONFIG_FILE')
                     ]) {
+                        // Copy certificates to workspace
                         sh "cp '$CLIENT_CERT' ${MINIKUBE_CERTS_DIR}/profiles/minikube/client.crt"
                         sh "cp '$CLIENT_KEY' ${MINIKUBE_CERTS_DIR}/profiles/minikube/client.key"
                         sh "cp '$CA_CRT' ${MINIKUBE_CERTS_DIR}/ca.crt"
+
+                        // Copy and modify kubeconfig
                         sh "cp '$KUBECONFIG_FILE' ${KUBECONFIG_PATH}"
-                        
                         sh """
                         sed -i 's|/home/prabhav/.minikube/profiles/minikube/client.crt|${MINIKUBE_CERTS_DIR}/profiles/minikube/client.crt|g' ${KUBECONFIG_PATH}
                         sed -i 's|/home/prabhav/.minikube/profiles/minikube/client.key|${MINIKUBE_CERTS_DIR}/profiles/minikube/client.key|g' ${KUBECONFIG_PATH}
                         sed -i 's|/home/prabhav/.minikube/ca.crt|${MINIKUBE_CERTS_DIR}/ca.crt|g' ${KUBECONFIG_PATH}
                         """
                         
+                        // Set secure permissions
                         sh "chmod 644 ${MINIKUBE_CERTS_DIR}/profiles/minikube/client.crt"
                         sh "chmod 600 ${MINIKUBE_CERTS_DIR}/profiles/minikube/client.key"
                         sh "chmod 644 ${MINIKUBE_CERTS_DIR}/ca.crt"
                         sh "chmod 600 ${KUBECONFIG_PATH}"
                     }
-                    
+
+                    // Verify Kubernetes access
                     sh "KUBECONFIG=${KUBECONFIG_PATH} kubectl cluster-info"
                 }
             }
         }
-
-        stage('Deploy to Kubernetes') {
+        stage('Deploy using Ansible') {
             steps {
                 script {
-                    sh """
-                    KUBECONFIG=${KUBECONFIG_PATH} kubectl apply -f k8s-manifests/ -n mlops-project
-                    KUBECONFIG=${KUBECONFIG_PATH} kubectl rollout restart deployment/frontend-deployment -n mlops-project
-                    KUBECONFIG=${KUBECONFIG_PATH} kubectl rollout restart deployment/backend-deployment -n mlops-project
-                    KUBECONFIG=${KUBECONFIG_PATH} kubectl rollout status deployment/frontend-deployment -n mlops-project --timeout=300s
-                    KUBECONFIG=${KUBECONFIG_PATH} kubectl rollout status deployment/backend-deployment -n mlops-project --timeout=300s
-                    """
+                    sh "ansible-playbook -i localhost, ansible/playbook.yml --extra-vars kubeconfig_path=${KUBECONFIG_PATH}"
                 }
             }
         }
@@ -153,20 +145,12 @@ pipeline {
 
     post {
         success {
-            script {
-                def frontend_url = sh(
-                    script: "KUBECONFIG=${KUBECONFIG_PATH} kubectl get svc frontend-service -n mlops-project -o jsonpath='http://{.status.loadBalancer.ingress[0].ip}:{.spec.ports[0].nodePort}'",
-                    returnStdout: true
-                ).trim()
-                
-                emailext(
-                    to: 'iam49smith@gmail.com',
-                    subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                    body: """<p>The build and deployment were <b>successful!</b></p>
-                             <p>Frontend URL: <a href="${frontend_url}">${frontend_url}</a></p>
-                             <p>Check the build details: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>"""
-                )
-            }
+            emailext(
+                to: 'iam49smith@gmail.com',
+                subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """<p>The build and deployment were <b>successful!</b></p>
+                         <p>Check the build details: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>"""
+            )
         }
         failure {
             emailext(
@@ -177,7 +161,6 @@ pipeline {
             )
         }
         always {
-            sh "docker system prune -f"
             cleanWs()
         }
     }
