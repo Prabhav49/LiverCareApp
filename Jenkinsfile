@@ -75,10 +75,11 @@ pipeline {
         stage('Authenticate and Deploy to Kubernetes') {
     steps {
         withCredentials([string(credentialsId: 'k8s-jenkins-token', variable: 'KUBE_TOKEN')]) {
-            script {
-                sh """
-                    mkdir -p \$HOME/.kube
-                    cat <<EOF > \$HOME/.kube/config
+            withEnv(["KUBECONFIG=${env.WORKSPACE}/.kubeconfig", "KUBE_TOKEN=${KUBE_TOKEN}"]) {
+                script {
+                    sh '''
+                        mkdir -p $(dirname $KUBECONFIG)
+                        cat <<EOF > $KUBECONFIG
 apiVersion: v1
 kind: Config
 clusters:
@@ -95,14 +96,16 @@ current-context: jenkins-context
 users:
 - name: jenkins
   user:
-    token: ${KUBE_TOKEN}
+    token: $KUBE_TOKEN
 EOF
-                    kubectl apply -f k8s-manifests/
-                """
+                        kubectl apply -f k8s-manifests/
+                    '''
+                }
             }
         }
     }
 }
+
 
 
     }
