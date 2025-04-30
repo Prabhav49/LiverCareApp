@@ -16,9 +16,13 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 script {
-                    // Install dependencies for backend and frontend
-                    sh 'pip install -r frontend/requirements.txt'
-                    sh 'pip install -r backend/requirements.txt'
+                    // Backend: Create virtual environment and install dependencies
+                    sh 'python3 -m venv venv-backend'
+                    sh '. venv-backend/bin/activate && pip install -r backend/requirements.txt'
+                    
+                    // Frontend: Create virtual environment and install dependencies
+                    sh 'python3 -m venv venv-frontend'
+                    sh '. venv-frontend/bin/activate && pip install -r frontend/requirements.txt'
                 }
             }
         }
@@ -27,7 +31,7 @@ pipeline {
             steps {
                 script {
                     // Run tests for backend
-                    sh 'pytest tests/backend/'
+                    sh '. venv-backend/bin/activate && pytest tests/backend/'
                 }
             }
         }
@@ -36,7 +40,7 @@ pipeline {
             steps {
                 script {
                     // Run tests for frontend
-                    sh 'pytest tests/frontend/'
+                    sh '. venv-frontend/bin/activate && pytest tests/frontend/'
                 }
             }
         }
