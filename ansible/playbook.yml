@@ -56,16 +56,15 @@
       command: "kubectl apply -f {{ manifests_dir }} -n {{ target_namespace }}"
       register: apply_result
 
-    - name: Get frontend service details
-      command: "kubectl get svc frontend-service -n {{ target_namespace }} -o json"
-      register: frontend_service
+    - name: Get frontend NodePort
+      command: "kubectl get svc frontend-service -n {{ target_namespace }} -o jsonpath='{.spec.ports[0].nodePort}'"
+      register: frontend_port
       changed_when: false
-      when: apply_result.rc == 0
 
     - name: Show access information
       debug:
         msg: |
           Deployment successful!
-          Frontend available at: http://{{ minikube_ip }}:{{ frontend_service.json.spec.ports[0].nodePort }}
+          Frontend available at: http://{{ minikube_ip }}:{{ frontend_port.stdout }}
           Or use port-forwarding: kubectl port-forward svc/frontend-service 8080:80 -n {{ target_namespace }}
       when: apply_result.rc == 0
