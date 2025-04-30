@@ -7,7 +7,7 @@
   vars:
     kubeconfig_path: "{{ kubeconfig_path | default('./.kube/config') }}"
     manifests_dir: "{{ playbook_dir }}/../k8s-manifests"
-    target_namespace: "mlops-project"  # Added namespace variable
+    target_namespace: "mlops-project"
 
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
@@ -46,14 +46,14 @@
 
     - name: Create namespace if missing
       command: "kubectl create namespace {{ target_namespace }}"
-      when: namespace_check.rc == 1  # Namespace doesn't exist
+      when: "'namespace/' + target_namespace not in namespace_check.stdout"
       register: create_namespace
       changed_when: create_namespace.rc == 0
 
     - name: Apply Kubernetes Manifests
       block:
-        - name: Apply manifests
-          command: "kubectl apply -f {{ manifests_dir }}"
+        - name: Apply namespace-specific manifests first
+          command: "kubectl apply -f {{ manifests_dir }} -n {{ target_namespace }}"
           register: apply_result
 
         - name: Verify resource creation
