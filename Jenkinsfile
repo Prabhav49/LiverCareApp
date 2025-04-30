@@ -78,12 +78,15 @@ pipeline {
         stage('Deploy using Ansible') {
             steps {
                 script {
-                    // Retrieve the kubeconfig file from Jenkins credentials
-                    withCredentials([file(credentialsId: 'kubeconfig-credentials', variable: 'KUBECONFIG_PATH')]) {
+                    // Retrieve the kubeconfig file from Jenkins credentials (as file)
+                    withCredentials([file(credentialsId: 'kube-config', variable: 'KUBECONFIG_PATH')]) {
+                        // Ensure the kubeconfig file is copied to the correct location
+                        sh 'cp $KUBECONFIG_PATH /tmp/kubeconfig'
+
                         // Deploy the app using Ansible
                         sh '''
                             ansible-playbook -i localhost, ansible/playbook.yml \
-                            --extra-vars "kubeconfig_path=$KUBECONFIG_PATH"
+                            --extra-vars "kubeconfig_path=/tmp/kubeconfig"
                         '''
                     }
                 }
