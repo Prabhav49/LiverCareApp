@@ -76,9 +76,9 @@ pipeline {
     steps {
         withCredentials([string(credentialsId: 'k8s-jenkins-token', variable: 'KUBE_TOKEN')]) {
             script {
-                sh '''
-                    mkdir -p $HOME/.kube
-                    cat <<EOF > $HOME/.kube/config
+                sh """
+                    mkdir -p \$HOME/.kube
+                    cat <<EOF > \$HOME/.kube/config
 apiVersion: v1
 kind: Config
 clusters:
@@ -98,11 +98,12 @@ users:
     token: ${KUBE_TOKEN}
 EOF
                     kubectl apply -f k8s-manifests/
-                '''
+                """
             }
         }
     }
 }
+
 
     }
 
