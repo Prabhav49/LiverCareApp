@@ -40,25 +40,33 @@
       ignore_errors: yes
 
     - name: Check if namespace exists
-      command: "kubectl get namespace {{ target_namespace }} --ignore-not-found"
+      command: "kubectl get namespace {{ target_namespace }} --ignore-not-found -o name"
       register: namespace_check
       changed_when: false
+      ignore_errors: yes
 
     - name: Create namespace if missing
       command: "kubectl create namespace {{ target_namespace }}"
-      when: "'namespace/' + target_namespace not in namespace_check.stdout"
+      when: namespace_check.stdout == ""
       register: create_namespace
       changed_when: create_namespace.rc == 0
+      ignore_errors: yes
 
     - name: Apply Kubernetes Manifests
       block:
-        - name: Apply namespace-specific manifests first
+        - name: Apply manifests
           command: "kubectl apply -f {{ manifests_dir }} -n {{ target_namespace }}"
           register: apply_result
 
         - name: Verify resource creation
           command: "kubectl get all -n {{ target_namespace }}"
           register: resource_check
+          when: apply_result.rc == 0
+
+        - name: Get frontend service URL
+          command: "minikube service frontend-service -n {{ target_namespace }} --url"
+          register: frontend_url
+          changed_when: false
           when: apply_result.rc == 0
       rescue:
         - name: Handle deployment failure
@@ -74,6 +82,6 @@
           Deployment successful!
           Created resources:
           {{ apply_result.stdout }}
-          Current namespace status:
-          {{ resource_check.stdout }}
+          
+          Access your frontend at: {{ frontend_url.stdout }}
       when: apply_result.rc == 0 and resource_check is defined
