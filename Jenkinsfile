@@ -5,8 +5,7 @@ pipeline {
         GIT_CREDENTIALS = 'github-cred'
         DOCKER_IMAGE_FRONTEND = 'prabhav49/frontend-app'
         DOCKER_IMAGE_BACKEND = 'prabhav49/backend-app'
-        KUBECONFIG = "/root/.kube/config"
-        K8S_TOKEN = credentials('k8s-jenkins-token')  // Jenkins credential for K8s token
+        K8S_TOKEN = credentials('k8s-jenkins-token')  
     }
 
     stages {
@@ -18,7 +17,6 @@ pipeline {
                 )
             }
         }
-
 
         stage('Install Dependencies') {
             steps {
@@ -77,41 +75,20 @@ pipeline {
             }
         }
 
-        stage('Authenticate and Deploy to Kubernetes') {
-    steps {
-        withCredentials([string(credentialsId: 'k8s-jenkins-token', variable: 'KUBE_TOKEN')]) {
-            withEnv(["KUBECONFIG=${env.WORKSPACE}/.kubeconfig", "KUBE_TOKEN=${KUBE_TOKEN}"]) {
+        stage('Deploy using Ansible') {
+            steps {
                 script {
-                    sh '''
-                        mkdir -p $(dirname $KUBECONFIG)
-                        cat <<EOF > $KUBECONFIG
-apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    server: https://192.168.49.2:8443
-    insecure-skip-tls-verify: true
-  name: k8s-cluster
-contexts:
-- context:
-    cluster: k8s-cluster
-    user: jenkins
-  name: jenkins-context
-current-context: jenkins-context
-users:
-- name: jenkins
-  user:
-    token: $KUBE_TOKEN
-EOF
-                        kubectl apply -f k8s-manifests/
-                    '''
+                    // Retrieve the kubeconfig file from Jenkins credentials
+                    withCredentials([file(credentialsId: 'kubeconfig-credentials', variable: 'KUBECONFIG_PATH')]) {
+                        // Deploy the app using Ansible
+                        sh '''
+                            ansible-playbook -i localhost, ansible/playbook.yml \
+                            --extra-vars "kubeconfig_path=$KUBECONFIG_PATH"
+                        '''
+                    }
                 }
             }
         }
-    }
-}
-
-
 
     }
 

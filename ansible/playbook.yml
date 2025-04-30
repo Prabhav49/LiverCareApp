@@ -1,0 +1,28 @@
+- name: Deploy LiverCareApp to Kubernetes using Ansible
+  hosts: localhost
+  tasks:
+    - name: Write kubeconfig to temporary location
+      copy:
+        dest: /tmp/kubeconfig
+        content: |
+          apiVersion: v1
+          kind: Config
+          clusters:
+          - cluster:
+              server: https://192.168.49.2:8443
+              insecure-skip-tls-verify: true
+            name: k8s-cluster
+          contexts:
+          - context:
+              cluster: k8s-cluster
+              user: jenkins
+            name: jenkins-context
+          current-context: jenkins-context
+          users:
+          - name: jenkins
+            user:
+              token: "{{ lookup('env', 'K8S_TOKEN') }}"
+      no_log: true
+
+    - name: Apply Kubernetes manifests
+      shell: KUBECONFIG=/tmp/kubeconfig kubectl apply -f {{ playbook_dir }}/../k8s-manifests/
