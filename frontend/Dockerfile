@@ -28,9 +28,6 @@ ENV FLASK_APP=frontend.py
 ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
 
-# Health check endpoint
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD curl -f http://localhost:5000/health || exit 1
 
 # Command to run the Flask app
 CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
