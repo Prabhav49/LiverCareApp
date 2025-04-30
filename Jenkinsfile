@@ -75,11 +75,10 @@ pipeline {
                 }
             }
         }
-        stage('Deploy to Kubernetes') {
+        stage('Apply Kubernetes Manifests') {
             steps {
                 script {
-                    // Apply the Kubernetes manifests in the k8s folder directly
-                    sh 'kubectl apply -f k8s/'
+                    sh 'kubectl apply -f k8s-manifests/'
                 }
             }
         }
