@@ -30,8 +30,11 @@ pipeline {
         stage('Run Backend Tests') {
             steps {
                 script {
-                    // Ensure backend testing works by adjusting PYTHONPATH and running pytest
-                    sh '. venv-backend/bin/activate && pytest tests/backend/ --maxfail=1 --disable-warnings -q'
+                    // Set PYTHONPATH to the src directory of the backend to ensure that backend module can be found
+                    sh '''
+                        export PYTHONPATH=$PYTHONPATH:/var/lib/jenkins/workspace/LiverCareApp/backend/src
+                        . venv-backend/bin/activate && pytest tests/backend/ --maxfail=1 --disable-warnings -q
+                    '''
                 }
             }
         }
