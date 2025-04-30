@@ -7,6 +7,7 @@
   vars:
     kubeconfig_path: "{{ kubeconfig_path | default('./.kube/config') }}"
     manifests_dir: "{{ playbook_dir }}/../k8s-manifests"
+    target_namespace: "mlops-project"  # Added namespace variable
 
   environment:
     KUBECONFIG: "{{ kubeconfig_path }}"
@@ -38,21 +39,41 @@
       changed_when: false
       ignore_errors: yes
 
-    - name: Fail if cannot connect to cluster
-      fail:
-        msg: "Failed to connect to Kubernetes cluster. Error: {{ cluster_info.stderr }}"
-      when: cluster_info.rc != 0
+    - name: Check if namespace exists
+      command: "kubectl get namespace {{ target_namespace }} --ignore-not-found"
+      register: namespace_check
+      changed_when: false
+
+    - name: Create namespace if missing
+      command: "kubectl create namespace {{ target_namespace }}"
+      when: namespace_check.rc == 1  # Namespace doesn't exist
+      register: create_namespace
+      changed_when: create_namespace.rc == 0
 
     - name: Apply Kubernetes Manifests
-      command: "kubectl apply -f {{ manifests_dir }}"
-      register: apply_result
+      block:
+        - name: Apply manifests
+          command: "kubectl apply -f {{ manifests_dir }}"
+          register: apply_result
 
-    - name: Verify deployment success
-      fail:
-        msg: "Failed to apply manifests. Error: {{ apply_result.stderr }}"
-      when: apply_result.rc != 0
+        - name: Verify resource creation
+          command: "kubectl get all -n {{ target_namespace }}"
+          register: resource_check
+          when: apply_result.rc == 0
+      rescue:
+        - name: Handle deployment failure
+          fail:
+            msg: |
+              Deployment failed!
+              Error: {{ apply_result.stderr }}
+              Applied resources: {{ apply_result.stdout }}
 
-    - name: Show deployment results
+    - name: Show deployment summary
       debug:
-        msg: "Successfully applied Kubernetes manifests. Output: {{ apply_result.stdout }}"
-      when: apply_result.rc == 0
+        msg: |
+          Deployment successful!
+          Created resources:
+          {{ apply_result.stdout }}
+          Current namespace status:
+          {{ resource_check.stdout }}
+      when: apply_result.rc == 0 and resource_check is defined
