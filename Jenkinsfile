@@ -4,6 +4,8 @@ pipeline {
     environment {
         DOCKER_IMAGE_FRONTEND = 'prabhav49/frontend-app'
         DOCKER_IMAGE_BACKEND = 'prabhav49/backend-app'
+        KUBECONFIG = "/root/.kube/config"
+        K8S_TOKEN = credentials('k8s-jenkins-token')  // Jenkins credential for K8s token
     }
 
     stages {
@@ -50,19 +52,13 @@ pipeline {
             }
         }
 
-
-        stage('Build Docker Images') {
+        stage('Build and Push Docker Images') {
             steps {
                 script {
                     // Build the Docker images for frontend and backend
                     sh 'docker build -t $DOCKER_IMAGE_FRONTEND ./frontend'
                     sh 'docker build -t $DOCKER_IMAGE_BACKEND ./backend'
                 }
-            }
-        }
-
-        stage('Push Docker Images') {
-            steps {
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     script {
                         // Login to Docker Hub
@@ -75,10 +71,17 @@ pipeline {
                 }
             }
         }
-        stage('Apply Kubernetes Manifests') {
+
+        stage('Authenticate and Deploy to Kubernetes') {
             steps {
                 script {
-                    sh 'kubectl apply -f k8s-manifests/'
+                    // Set the Kubernetes credentials
+                    sh """
+                    kubectl config set-credentials jenkins --token=${K8S_TOKEN}
+                    kubectl config set-context jenkins-context --cluster=minikube --user=jenkins --namespace=default
+                    kubectl config use-context jenkins-context
+                    kubectl apply -f k8s-manifests/
+                    """
                 }
             }
         }
