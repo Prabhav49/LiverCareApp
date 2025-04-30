@@ -1,33 +1,23 @@
+---
 - name: Deploy LiverCareApp to Kubernetes using Ansible
   hosts: localhost
   connection: local
   gather_facts: no
+
   vars:
-    kubeconfig_path: "{{ kubeconfig_path | default('/tmp/kubeconfig') }}"  # Use default path if not passed
+    kubeconfig_path: "{{ kubeconfig_path | default('./.kube/config') }}"
 
   tasks:
-    - name: Write kubeconfig to temporary location
-      copy:
-        dest: "{{ kubeconfig_path }}"
-        content: |
-          apiVersion: v1
-          kind: Config
-          clusters:
-          - cluster:
-              server: https://192.168.49.2:8443
-              insecure-skip-tls-verify: true
-            name: k8s-cluster
-          contexts:
-          - context:
-              cluster: k8s-cluster
-              user: jenkins
-            name: jenkins-context
-          current-context: jenkins-context
-          users:
-          - name: jenkins
-            user:
-              token: "{{ lookup('env', 'K8S_TOKEN') }}"
-      no_log: true
 
-    - name: Apply Kubernetes manifests
-      shell: KUBECONFIG={{ kubeconfig_path }} kubectl apply -f {{ playbook_dir }}/../k8s-manifests/
+    - name: Verify kubeconfig file exists
+      stat:
+        path: "{{ kubeconfig_path }}"
+      register: kubeconfig_file
+
+    - name: Fail if kubeconfig is missing
+      fail:
+        msg: "Kubeconfig not found at {{ kubeconfig_path }}"
+      when: not kubeconfig_file.stat.exists
+
+    - name: Apply Kubernetes Manifests
+      shell: KUBECONFIG="{{ kubeconfig_path }}" kubectl apply -f {{ playbook_dir }}/../k8s-manifests/
