@@ -42,11 +42,14 @@ pipeline {
         stage('Run Frontend Tests') {
             steps {
                 script {
-                    // Run frontend tests
-                    sh '. venv-frontend/bin/activate && pytest tests/frontend/ --maxfail=1 --disable-warnings -q'
+                    sh '''
+                        export PYTHONPATH=$PYTHONPATH:$PWD/frontend
+                        . venv-frontend/bin/activate && pytest tests/frontend/ --maxfail=1 --disable-warnings -q
+                    '''
                 }
             }
         }
+
 
         stage('Build Docker Images') {
             steps {
