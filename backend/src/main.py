@@ -6,6 +6,11 @@ import os
 
 app = FastAPI()
 
+# Add the root endpoint to match the test case
+@app.get("/")
+async def read_main():
+    return {"message": "Hello World"}
+
 # Load model
 try:
     current_dir = os.path.dirname(__file__)  # /home/prabhav/SPE_Project/backend/src
