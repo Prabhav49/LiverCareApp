@@ -1,6 +1,8 @@
 import sys
 import os
 import pytest 
+
+# Add the frontend directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../frontend')))
 
 from frontend import app
@@ -13,4 +15,5 @@ def client():
 def test_homepage(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert b"Hello, World!" in response.data  # Adjust based on your frontend's response
+    # Check for actual content in the HTML page
+    assert b"Liver Disease Prediction System" in response.data
