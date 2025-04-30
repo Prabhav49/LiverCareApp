@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     environment {
+        GIT_CREDENTIALS = 'github-cred'
         DOCKER_IMAGE_FRONTEND = 'prabhav49/frontend-app'
         DOCKER_IMAGE_BACKEND = 'prabhav49/backend-app'
         KUBECONFIG = "/root/.kube/config"
@@ -11,9 +12,13 @@ pipeline {
     stages {
         stage('Clone Repository') {
             steps {
-                git 'https://github.com/Prabhav49/LiverCareApp.git'
+                git(
+                    url: 'https://github.com/Prabhav49/LiverCareApp.git',
+                    credentialsId: 'github-cred'
+                )
             }
         }
+
 
         stage('Install Dependencies') {
             steps {
