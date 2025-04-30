@@ -1,5 +1,5 @@
 import pytest
-from frontend import app  # Adjust if necessary to import your Flask app
+from frontend import app  # This should align with your folder structure for Flask app
 
 @pytest.fixture
 def client():
