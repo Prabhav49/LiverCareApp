@@ -73,18 +73,37 @@ pipeline {
         }
 
         stage('Authenticate and Deploy to Kubernetes') {
-            steps {
-                script {
-                    // Set the Kubernetes credentials
-                    sh """
-                    kubectl config set-credentials jenkins --token=${K8S_TOKEN}
-                    kubectl config set-context jenkins-context --cluster=minikube --user=jenkins --namespace=default
-                    kubectl config use-context jenkins-context
+    steps {
+        withCredentials([string(credentialsId: 'k8s-jenkins-token', variable: 'KUBE_TOKEN')]) {
+            script {
+                sh '''
+                    mkdir -p $HOME/.kube
+                    cat <<EOF > $HOME/.kube/config
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://your-k8s-cluster-url
+    insecure-skip-tls-verify: true
+  name: k8s-cluster
+contexts:
+- context:
+    cluster: k8s-cluster
+    user: jenkins
+  name: jenkins-context
+current-context: jenkins-context
+users:
+- name: jenkins
+  user:
+    token: ${KUBE_TOKEN}
+EOF
                     kubectl apply -f k8s-manifests/
-                    """
-                }
+                '''
             }
         }
+    }
+}
+
     }
 
     post {
