@@ -4,6 +4,10 @@ FROM python:3.9-slim
 # Set working directory
 WORKDIR /app
 
+# Add build argument for version tracking
+ARG BUILD_NUMBER
+ENV BUILD_NUMBER=$BUILD_NUMBER
+
 # Copy requirements file
 COPY requirements.txt .
 
@@ -24,5 +28,9 @@ ENV FLASK_APP=frontend.py
 ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
 
-# Command to run the Flask app, binding to all interfaces so it's accessible from outside the container
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD curl -f http://localhost:5000/health || exit 1
+
+# Command to run the Flask app
 CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]

@@ -124,6 +124,10 @@ def index():
     
     return render_template('index.html', form=form, result=prediction_result, error=error_message)
 
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
 # Create a simple API endpoint for testing
 @app.route('/api/predict', methods=['POST'])
 def api_predict():
