@@ -21,21 +21,9 @@ spec:
       containers:
       - name: frontend-container
         image: prabhav49/frontend-app:latest
-        imagePullPolicy: Always  # Force pull of new images
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
         env:
         - name: BACKEND_URL
           value: "http://backend-service:8000"
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 5000
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 5000
-          initialDelaySeconds: 15
-          periodSeconds: 20
