@@ -45,14 +45,10 @@ async def predict(data: PatientData):
             data.albumin_globulin_ratio
         ]
         
-        # Reshape and scale
         input_array = np.array(input_values).reshape(1, -1)
+        
         scaled_data = (input_array - model['mean']) / model['std']
-        
-        # PCA transformation - use only first n_components
-        pca_data = np.dot(scaled_data, model['eigenvectors'][:,:model['n_components']])
-        
-        # Add bias term and predict
+        pca_data = np.dot(scaled_data, model['eigenvectors'])
         pca_with_bias = np.c_[np.ones((pca_data.shape[0], 1)), pca_data]
         probability = 1 / (1 + np.exp(-np.dot(pca_with_bias, model['weights'])))
         
@@ -63,7 +59,3 @@ async def predict(data: PatientData):
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
