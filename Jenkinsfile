@@ -137,7 +137,12 @@ pipeline {
         stage('Deploy using Ansible') {
             steps {
                 script {
-                    sh "ansible-playbook -i localhost, ansible/playbook.yml --extra-vars kubeconfig_path=${KUBECONFIG_PATH}"
+                    sh """
+                    ansible-playbook -i localhost, ansible/playbook.yml \
+                        --extra-vars kubeconfig_path=${KUBECONFIG_PATH} \
+                        --extra-vars frontend_image_tag=${DOCKER_TAG} \
+                        --extra-vars backend_image_tag=${DOCKER_TAG}
+                    """
                 }
             }
         }
