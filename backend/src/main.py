@@ -1,11 +1,19 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 import numpy as np
 import pandas as pd
 import pickle
 import os
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import Response
+import time
 
 app = FastAPI()
+
+# Define Prometheus metrics
+REQUESTS = Counter('backend_requests_total', 'Total number of requests to backend', ['method', 'endpoint', 'status'])
+PREDICTIONS = Counter('backend_predictions_total', 'Total number of predictions made', ['result'])
+PREDICTION_TIME = Histogram('backend_prediction_processing_seconds', 'Time spent processing prediction')
 
 # Load model
 try:
@@ -29,9 +37,22 @@ class PatientData(BaseModel):
     albumin: float
     albumin_globulin_ratio: float
 
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    REQUESTS.labels(method=request.method, endpoint=request.url.path, status=response.status_code).inc()
+    return response
+
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 @app.post("/predict")
 async def predict(data: PatientData):
     try:
+        start_time = time.time()
         input_values = [
             data.age,
             data.gender,
@@ -52,10 +73,20 @@ async def predict(data: PatientData):
         pca_with_bias = np.c_[np.ones((pca_data.shape[0], 1)), pca_data]
         probability = 1 / (1 + np.exp(-np.dot(pca_with_bias, model['weights'])))
         
+        prediction_result = int(probability[0][0] >= 0.5)
+        PREDICTIONS.labels(result=str(prediction_result)).inc()
+        
+        process_time = time.time() - start_time
+        PREDICTION_TIME.observe(process_time)
+        
         return {
             "probability": float(probability[0][0]),
-            "prediction": int(probability[0][0] >= 0.5)
+            "prediction": prediction_result
         }
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}

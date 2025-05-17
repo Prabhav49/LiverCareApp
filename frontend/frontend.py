@@ -1,11 +1,19 @@
-from flask import Flask, render_template, request, jsonify, flash
+from flask import Flask, render_template, request, jsonify, flash, Response
 import requests
 from wtforms import Form, FloatField, SelectField, validators
 import re
 import os
+import time
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST, REGISTRY
 
 app = Flask(__name__)
 app.secret_key = 'liver_disease_prediction_app'  # Required for flash messages
+
+# Define Prometheus metrics
+REQUESTS = Counter('frontend_requests_total', 'Total number of requests to frontend', ['method', 'endpoint', 'status'])
+BACKEND_REQUESTS = Counter('frontend_backend_requests_total', 'Total number of backend API calls', ['status'])
+PREDICTIONS = Counter('frontend_predictions_total', 'Total number of predictions requested', ['result'])
+REQUEST_TIME = Histogram('frontend_request_processing_seconds', 'Time spent processing request', ['endpoint'])
 
 class FloatValidationError(ValueError):
     pass
@@ -70,8 +78,17 @@ class PredictionForm(Form):
         validators.NumberRange(min=0, max=10, message="Albumin Globulin Ratio must be between 0 and 10")
     ])
 
+@app.route('/metrics')
+def metrics():
+    return Response(generate_latest(REGISTRY), mimetype=CONTENT_TYPE_LATEST)
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy"})
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    start_time = time.time()
     form = PredictionForm(request.form)
     prediction_result = None
     error_message = None
@@ -111,7 +128,12 @@ def index():
                 
                 if response.status_code == 200:
                     prediction_result = response.json()
+                    BACKEND_REQUESTS.labels(status='success').inc()
+                    # Record prediction result
+                    if 'prediction' in prediction_result:
+                        PREDICTIONS.labels(result=str(prediction_result['prediction'])).inc()
                 else:
+                    BACKEND_REQUESTS.labels(status='error').inc()
                     error_message = f"API Error: {response.status_code}"
                     try:
                         error_details = response.json().get('detail', 'Unknown error')
@@ -119,16 +141,24 @@ def index():
                     except:
                         pass
             except Exception as e:
+                BACKEND_REQUESTS.labels(status='exception').inc()
                 error_message = f"Error: {str(e)}"
         else:
             # Form validation failed
             error_message = "Please fix the errors in the form."
+    
+    # Record metrics
+    process_time = time.time() - start_time
+    REQUEST_TIME.labels(endpoint='/').observe(process_time)
+    status = "200" if error_message is None else "400"
+    REQUESTS.labels(method=request.method, endpoint='/', status=status).inc()
     
     return render_template('index.html', form=form, result=prediction_result, error=error_message)
 
 # Create a simple API endpoint for testing
 @app.route('/api/predict', methods=['POST'])
 def api_predict():
+    start_time = time.time()
     try:
         data = request.json
         
@@ -141,6 +171,7 @@ def api_predict():
         
         for field in required_fields:
             if field not in data:
+                REQUESTS.labels(method=request.method, endpoint='/api/predict', status='400').inc()
                 return jsonify({"error": f"Missing required field: {field}"}), 400
             
             # Validate numeric fields (except gender)
@@ -148,12 +179,15 @@ def api_predict():
                 try:
                     value = float(data[field])
                     if value < 0:
+                        REQUESTS.labels(method=request.method, endpoint='/api/predict', status='400').inc()
                         return jsonify({"error": f"{field} cannot be negative"}), 400
                 except (ValueError, TypeError):
+                    REQUESTS.labels(method=request.method, endpoint='/api/predict', status='400').inc()
                     return jsonify({"error": f"{field} must be a valid number"}), 400
         
         # Validate gender specifically
         if data['gender'] not in [0, 1, '0', '1']:
+            REQUESTS.labels(method=request.method, endpoint='/api/predict', status='400').inc()
             return jsonify({"error": "Gender must be 0 (Female) or 1 (Male)"}), 400
             
         # Convert gender to int if it's a string
@@ -162,8 +196,25 @@ def api_predict():
             
         backend_url = os.getenv('BACKEND_URL', 'http://backend-service:8000')
         response = requests.post(f'{backend_url}/predict', json=data)
+        
+        status_code = response.status_code
+        if status_code == 200:
+            BACKEND_REQUESTS.labels(status='success').inc()
+            result = response.json()
+            if 'prediction' in result:
+                PREDICTIONS.labels(result=str(result['prediction'])).inc()
+        else:
+            BACKEND_REQUESTS.labels(status='error').inc()
+            
+        # Record metrics
+        process_time = time.time() - start_time
+        REQUEST_TIME.labels(endpoint='/api/predict').observe(process_time)
+        REQUESTS.labels(method=request.method, endpoint='/api/predict', status=str(status_code)).inc()
+            
         return jsonify(response.json()), response.status_code
     except Exception as e:
+        REQUESTS.labels(method=request.method, endpoint='/api/predict', status='500').inc()
+        BACKEND_REQUESTS.labels(status='exception').inc()
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
