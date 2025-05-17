@@ -81,6 +81,14 @@
       command: "kubectl rollout restart deployment/backend-deployment -n {{ target_namespace }}"
       when: backend_image_tag == 'latest'
 
+    - name: Rollout Restart Prometheus
+      command: "kubectl rollout restart deployment/prometheus -n {{ target_namespace }}"
+      ignore_errors: yes
+
+    - name: Rollout Restart Grafana
+      command: "kubectl rollout restart deployment/grafana -n {{ target_namespace }}"
+      ignore_errors: yes
+
     - name: Get frontend NodePort
       command: "kubectl get svc frontend-service -n {{ target_namespace }} -o jsonpath='{.spec.ports[0].nodePort}'"
       register: frontend_port
