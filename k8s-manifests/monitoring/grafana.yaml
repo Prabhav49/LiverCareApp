@@ -1,3 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-storage-claim
+  namespace: mlops-project
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,7 +47,8 @@ spec:
           mountPath: /etc/grafana/provisioning/datasources
       volumes:
       - name: grafana-storage
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: grafana-storage-claim
       - name: grafana-datasources
         configMap:
           name: grafana-datasources
