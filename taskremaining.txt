@@ -1,5 +1,5 @@
-1) Integrate Priyansh code
-2) Promethues aur grafa pod mai chalana hai
-3) Retrain ka pod
-4) Security --> Trivy
+1) Integrate Priyansh code ---- done
+2) Promethues aur grafa pod mai chalana hai ---- done
+3) Retrain ka pod ---- remaining
+4) Security --> Trivy ----- > Done
 5) Role base -> namespace se hota hai
