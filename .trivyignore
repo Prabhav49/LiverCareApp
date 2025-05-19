@@ -1,0 +1,7 @@
+# Trivy ignore file
+# Format: Each line contains a vulnerability ID to ignore
+# Example:
+# CVE-2021-12345
+# CVE-2020-67890
+
+# Add specific vulnerabilities to ignore below

@@ -1,0 +1,25 @@
+# Trivy Configuration File
+
+# Severity levels to scan for
+severity: ["HIGH", "CRITICAL"]
+
+# Exit with error code when vulnerabilities are found
+exit-code: 1
+
+# Output format (table, json, template)
+format: "table"
+
+# Cache directory for efficient scanning
+cache-dir: ".trivy"
+
+# Ignore unfixed vulnerabilities
+ignore-unfixed: true
+
+# Number of concurrent scans
+concurrency: 2
+
+# Timeout duration (default: 5m)
+timeout: "10m"
+
+# Skip specific vulnerabilities by ID
+ignorefile: ".trivyignore"

@@ -77,6 +77,72 @@ pipeline {
             }
         }
 
+        stage('Security Scan with Trivy') {
+            steps {
+                script {
+                    // Install Trivy if not already installed
+                    sh '''
+                        if ! command -v trivy &> /dev/null; then
+                            echo "Installing Trivy..."
+                            wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add -
+                            echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | tee -a /etc/apt/sources.list.d/trivy.list
+                            apt-get update
+                            apt-get install -y trivy
+                        fi
+                    '''
+                    
+                    // Create directory for reports
+                    sh "mkdir -p trivy-reports"
+                    
+                    // Scan frontend image using config file - both text and HTML format
+                    sh """
+                    trivy image \
+                        --config trivy-config.yml \
+                        --output trivy-reports/frontend-scan-results.txt \
+                        ${DOCKER_IMAGE_FRONTEND}:${DOCKER_TAG}
+                    
+                    # Generate HTML report for better visualization
+                    trivy image \
+                        --config trivy-config.yml \
+                        --format template \
+                        --template "@/usr/local/share/trivy/templates/html.tpl" \
+                        --output trivy-reports/frontend-scan-results.html \
+                        ${DOCKER_IMAGE_FRONTEND}:${DOCKER_TAG}
+                    """
+                    
+                    // Scan backend image using config file - both text and HTML format
+                    sh """
+                    trivy image \
+                        --config trivy-config.yml \
+                        --output trivy-reports/backend-scan-results.txt \
+                        ${DOCKER_IMAGE_BACKEND}:${DOCKER_TAG}
+                        
+                    # Generate HTML report for better visualization
+                    trivy image \
+                        --config trivy-config.yml \
+                        --format template \
+                        --template "@/usr/local/share/trivy/templates/html.tpl" \
+                        --output trivy-reports/backend-scan-results.html \
+                        ${DOCKER_IMAGE_BACKEND}:${DOCKER_TAG}
+                    """
+
+                    // Archive scan results - both text and HTML
+                    archiveArtifacts artifacts: 'trivy-reports/*', allowEmptyArchive: true
+                    
+                    // Optional: Publish HTML reports
+                    publishHTML([
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'trivy-reports',
+                        reportFiles: 'frontend-scan-results.html, backend-scan-results.html',
+                        reportName: 'Trivy Security Reports',
+                        reportTitles: 'Frontend Security Report, Backend Security Report'
+                    ])
+                }
+            }
+        }
+
         stage('Push Docker Images') {
             steps {
                 withCredentials([usernamePassword(
