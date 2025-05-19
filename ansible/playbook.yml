@@ -10,6 +10,7 @@
     kubeconfig_path: "{{ kubeconfig_path | default('./.kube/config') }}"
     manifests_dir: "{{ playbook_dir }}/../k8s-manifests"
     monitoring_dir: "{{ playbook_dir }}/../k8s-manifests/monitoring"
+    rbac_dir: "{{ playbook_dir }}/../k8s-manifests/rbac"
     target_namespace: "mlops-project"
     minikube_ip: "192.168.49.2"  # Set your Minikube IP here
 
@@ -54,6 +55,10 @@
       register: create_namespace
       changed_when: create_namespace.rc == 0
       ignore_errors: yes
+
+    - name: Apply RBAC Manifests
+      command: "kubectl apply -f {{ rbac_dir }} -n {{ target_namespace }}"
+      register: apply_rbac_result
 
     - name: Apply Kubernetes Manifests
       command: "kubectl apply -f {{ manifests_dir }} -n {{ target_namespace }}"

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops-project
+  labels:
+    name: mlops-project
+    environment: production

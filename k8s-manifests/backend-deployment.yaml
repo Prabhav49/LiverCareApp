@@ -18,6 +18,7 @@ spec:
       labels:
         app: backend
     spec:
+      serviceAccountName: ml-engineer
       containers:
       - name: backend-container
         image: prabhav49/backend-app:latest

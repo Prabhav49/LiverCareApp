@@ -1,0 +1,32 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ml-engineer-role
+  namespace: mlops-project
+rules:
+- apiGroups: ["", "apps", "batch"]
+  resources: ["pods", "pods/log", "pods/exec", "jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["configmaps", "secrets", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ml-engineer
+  namespace: mlops-project
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ml-engineer-binding
+  namespace: mlops-project
+subjects:
+- kind: ServiceAccount
+  name: ml-engineer
+  namespace: mlops-project
+roleRef:
+  kind: Role
+  name: ml-engineer-role
+  apiGroup: rbac.authorization.k8s.io

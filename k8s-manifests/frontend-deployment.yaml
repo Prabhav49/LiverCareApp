@@ -18,6 +18,7 @@ spec:
       labels:
         app: frontend
     spec:
+      serviceAccountName: mlops-developer
       containers:
       - name: frontend-container
         image: prabhav49/frontend-app:latest

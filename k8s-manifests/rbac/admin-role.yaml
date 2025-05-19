@@ -1,0 +1,29 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mlops-admin-role
+  namespace: mlops-project
+rules:
+- apiGroups: ["", "apps", "batch", "extensions"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mlops-admin
+  namespace: mlops-project
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mlops-admin-binding
+  namespace: mlops-project
+subjects:
+- kind: ServiceAccount
+  name: mlops-admin
+  namespace: mlops-project
+roleRef:
+  kind: Role
+  name: mlops-admin-role
+  apiGroup: rbac.authorization.k8s.io

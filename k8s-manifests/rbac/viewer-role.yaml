@@ -1,0 +1,32 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mlops-viewer-role
+  namespace: mlops-project
+rules:
+- apiGroups: ["", "apps", "batch", "extensions"]
+  resources: ["deployments", "replicasets", "pods", "services", "configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get", "list"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mlops-viewer
+  namespace: mlops-project
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mlops-viewer-binding
+  namespace: mlops-project
+subjects:
+- kind: ServiceAccount
+  name: mlops-viewer
+  namespace: mlops-project
+roleRef:
+  kind: Role
+  name: mlops-viewer-role
+  apiGroup: rbac.authorization.k8s.io
