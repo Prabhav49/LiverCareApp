@@ -80,53 +80,61 @@ pipeline {
         stage('Security Scan with Trivy') {
             steps {
                 script {
-                    // Install Trivy if not already installed
+                    // Install Trivy using a more compatible approach
                     sh '''
                         if ! command -v trivy &> /dev/null; then
                             echo "Installing Trivy..."
-                            wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add -
-                            echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | tee -a /etc/apt/sources.list.d/trivy.list
-                            apt-get update
-                            apt-get install -y trivy
+                            # Download precompiled binary instead of using apt
+                            VERSION=$(curl --silent "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\\1/')
+                            wget -q https://github.com/aquasecurity/trivy/releases/download/v${VERSION}/trivy_${VERSION}_Linux-64bit.tar.gz
+                            tar zxvf trivy_${VERSION}_Linux-64bit.tar.gz
+                            chmod +x trivy
+                            # Use the local binary
+                            TRIVY_PATH="$PWD/trivy"
+                        else
+                            TRIVY_PATH="trivy"
                         fi
+                        
+                        export TRIVY_PATH
                     '''
                     
                     // Create directory for reports
                     sh "mkdir -p trivy-reports"
                     
-                    // Scan frontend image using config file - both text and HTML format
-                    sh """
-                    trivy image \
-                        --config trivy-config.yml \
-                        --output trivy-reports/frontend-scan-results.txt \
-                        ${DOCKER_IMAGE_FRONTEND}:${DOCKER_TAG}
+                    // Use the locally installed Trivy if needed
+                    sh '''
+                        if [ -x "$PWD/trivy" ]; then
+                            TRIVY_PATH="$PWD/trivy"
+                        else
+                            TRIVY_PATH="trivy"
+                        fi
                     
-                    # Generate HTML report for better visualization
-                    trivy image \
-                        --config trivy-config.yml \
-                        --format template \
-                        --template "@/usr/local/share/trivy/templates/html.tpl" \
-                        --output trivy-reports/frontend-scan-results.html \
-                        ${DOCKER_IMAGE_FRONTEND}:${DOCKER_TAG}
-                    """
-                    
-                    // Scan backend image using config file - both text and HTML format
-                    sh """
-                    trivy image \
-                        --config trivy-config.yml \
-                        --output trivy-reports/backend-scan-results.txt \
-                        ${DOCKER_IMAGE_BACKEND}:${DOCKER_TAG}
+                        # Scan frontend image
+                        $TRIVY_PATH image \\
+                            --severity HIGH,CRITICAL \\
+                            --no-progress \\
+                            --output trivy-reports/frontend-scan-results.txt \\
+                            ${DOCKER_IMAGE_FRONTEND}:${DOCKER_TAG}
                         
-                    # Generate HTML report for better visualization
-                    trivy image \
-                        --config trivy-config.yml \
-                        --format template \
-                        --template "@/usr/local/share/trivy/templates/html.tpl" \
-                        --output trivy-reports/backend-scan-results.html \
-                        ${DOCKER_IMAGE_BACKEND}:${DOCKER_TAG}
-                    """
+                        # Generate simple HTML report for frontend
+                        echo "<html><head><title>Frontend Security Report</title></head><body><pre>" > trivy-reports/frontend-scan-results.html
+                        cat trivy-reports/frontend-scan-results.txt >> trivy-reports/frontend-scan-results.html
+                        echo "</pre></body></html>" >> trivy-reports/frontend-scan-results.html
+                        
+                        # Scan backend image
+                        $TRIVY_PATH image \\
+                            --severity HIGH,CRITICAL \\
+                            --no-progress \\
+                            --output trivy-reports/backend-scan-results.txt \\
+                            ${DOCKER_IMAGE_BACKEND}:${DOCKER_TAG}
+                            
+                        # Generate simple HTML report for backend
+                        echo "<html><head><title>Backend Security Report</title></head><body><pre>" > trivy-reports/backend-scan-results.html
+                        cat trivy-reports/backend-scan-results.txt >> trivy-reports/backend-scan-results.html
+                        echo "</pre></body></html>" >> trivy-reports/backend-scan-results.html
+                    '''
 
-                    // Archive scan results - both text and HTML
+                    // Archive scan results
                     archiveArtifacts artifacts: 'trivy-reports/*', allowEmptyArchive: true
                     
                     // Optional: Publish HTML reports
