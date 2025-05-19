@@ -137,16 +137,8 @@ pipeline {
                     // Archive scan results
                     archiveArtifacts artifacts: 'trivy-reports/*', allowEmptyArchive: true
                     
-                    // Optional: Publish HTML reports
-                    publishHTML([
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'trivy-reports',
-                        reportFiles: 'frontend-scan-results.html, backend-scan-results.html',
-                        reportName: 'Trivy Security Reports',
-                        reportTitles: 'Frontend Security Report, Backend Security Report'
-                    ])
+                    // Add information about where to find the reports
+                    echo "Trivy security scan complete. Reports are available as build artifacts."
                 }
             }
         }
