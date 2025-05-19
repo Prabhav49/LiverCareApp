@@ -2,4 +2,4 @@
 2) Promethues aur grafa pod mai chalana hai ---- done
 3) Retrain ka pod ---- remaining
 4) Security --> Trivy ----- > Done
-5) Role base -> namespace se hota hai
+5) Role base -> Done
