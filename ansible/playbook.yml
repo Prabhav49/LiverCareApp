@@ -80,7 +80,7 @@
       when: backend_image_tag != 'latest'
 
     - name: Update Model-Retrain Image
-      command: "kubectl set image deployment/model-retrain-deployment model-retrain-container=prabhav49/model-retrain-app:{{ retrain_image_tag }} -n {{ target_namespace }}"
+      command: "kubectl set image deployment/model-retrain-deployment model-retrain=prabhav49/model-retrain-app:{{ retrain_image_tag }} -n {{ target_namespace }}"
       register: update_retrain
       when: retrain_image_tag != 'latest'
 
