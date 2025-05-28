@@ -347,10 +347,6 @@ kubectl scale deployment frontend-deployment --replicas=3 -n mlops-project
 4. **Run security scans**: Ensure Trivy passes
 5. **Submit pull request** with detailed description
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## 🙏 Acknowledgments
 
 - **Liver Patient Dataset** from UCI ML Repository
