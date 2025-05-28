@@ -8,8 +8,16 @@ from datetime import datetime
 import threading
 import time
 import shutil
+from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 app = Flask(__name__)
+
+# Prometheus metrics
+feedback_requests_total = Counter('model_retrain_feedback_requests_total', 'Total number of feedback requests')
+retraining_runs_total = Counter('model_retrain_runs_total', 'Total number of retraining runs')
+current_retraining_status = Gauge('model_retrain_is_retraining', 'Whether model is currently retraining')
+feedback_data_count = Gauge('model_retrain_feedback_data_count', 'Number of feedback records stored')
+retraining_duration_seconds = Histogram('model_retrain_duration_seconds', 'Time spent retraining the model')
 
 # Global variables for thread safety
 retraining_lock = threading.Lock()
@@ -78,6 +86,9 @@ def add_feedback_data():
         # Store feedback data
         store_feedback_data(data)
         
+        # Increment feedback requests counter
+        feedback_requests_total.inc()
+        
         # Trigger retraining in background if not already running
         if not is_retraining:
             threading.Thread(target=retrain_model_background, daemon=True).start()
@@ -117,6 +128,9 @@ def store_feedback_data(data):
             writer.writeheader()
         
         writer.writerow(csv_row)
+    
+    # Update feedback data count gauge
+    feedback_data_count.set(len(pd.read_csv(FEEDBACK_CSV_PATH)))
 
 def retrain_model_background():
     """Background task to retrain the model"""
@@ -127,8 +141,14 @@ def retrain_model_background():
             return
         is_retraining = True
     
+    # Update retraining status gauge
+    current_retraining_status.set(1)
+    
     try:
         print(f"[{datetime.now()}] Starting model retraining...")
+        
+        # Start retraining duration timer
+        start_time = time.time()
         
         # Load original training data
         if not os.path.exists(TRAINING_CSV_PATH):
@@ -178,10 +198,17 @@ def retrain_model_background():
         
         print(f"[{datetime.now()}] Model retraining completed. New model saved to {shared_model_path}")
         
+        # Increment retraining runs counter
+        retraining_runs_total.inc()
+        
+        # Record retraining duration
+        retraining_duration_seconds.observe(time.time() - start_time)
+        
     except Exception as e:
         print(f"Error during retraining: {str(e)}")
     finally:
         is_retraining = False
+        current_retraining_status.set(0)
 
 def train_model(df):
     """Train the logistic regression model using the same process as original training"""
@@ -316,6 +343,19 @@ def retrain_status():
         "feedback_data_exists": os.path.exists(FEEDBACK_CSV_PATH),
         "training_data_exists": os.path.exists(TRAINING_CSV_PATH)
     })
+
+@app.route('/metrics')
+def metrics():
+    """Prometheus metrics endpoint"""
+    # Update feedback data count gauge if file exists
+    if os.path.exists(FEEDBACK_CSV_PATH):
+        try:
+            df = pd.read_csv(FEEDBACK_CSV_PATH)
+            feedback_data_count.set(len(df))
+        except Exception:
+            pass
+    
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
