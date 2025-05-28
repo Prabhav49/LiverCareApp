@@ -5,6 +5,7 @@ pipeline {
         GIT_CREDENTIALS = 'github-cred'
         DOCKER_IMAGE_FRONTEND = 'prabhav49/frontend-app'
         DOCKER_IMAGE_BACKEND = 'prabhav49/backend-app'
+        DOCKER_IMAGE_RETRAIN = 'prabhav49/model-retrain-app'  // Added model-retrain image
         DOCKER_TAG = "${env.BUILD_NUMBER}"  // Unique tag per build
         KUBECONFIG_FILE = credentials('kube-config')
         KUBECONFIG_PATH = "${WORKSPACE}/.kube/config"
@@ -73,6 +74,14 @@ pipeline {
                         -t ${DOCKER_IMAGE_BACKEND}:latest \
                         ./backend
                     """
+                    sh """
+                    docker build \
+                        --no-cache \
+                        --build-arg BUILD_NUMBER=${env.BUILD_NUMBER} \
+                        -t ${DOCKER_IMAGE_RETRAIN}:${DOCKER_TAG} \
+                        -t ${DOCKER_IMAGE_RETRAIN}:latest \
+                        ./model-retrain
+                    """
                 }
             }
         }
@@ -132,6 +141,18 @@ pipeline {
                         echo "<html><head><title>Backend Security Report</title></head><body><pre>" > trivy-reports/backend-scan-results.html
                         cat trivy-reports/backend-scan-results.txt >> trivy-reports/backend-scan-results.html
                         echo "</pre></body></html>" >> trivy-reports/backend-scan-results.html
+                        
+                        # Scan model-retrain image
+                        $TRIVY_PATH image \\
+                            --severity HIGH,CRITICAL \\
+                            --no-progress \\
+                            --output trivy-reports/model-retrain-scan-results.txt \\
+                            ${DOCKER_IMAGE_RETRAIN}:${DOCKER_TAG}
+                            
+                        # Generate simple HTML report for model-retrain
+                        echo "<html><head><title>Model Retrain Security Report</title></head><body><pre>" > trivy-reports/model-retrain-scan-results.html
+                        cat trivy-reports/model-retrain-scan-results.txt >> trivy-reports/model-retrain-scan-results.html
+                        echo "</pre></body></html>" >> trivy-reports/model-retrain-scan-results.html
                     '''
 
                     // Archive scan results
@@ -156,6 +177,8 @@ pipeline {
                         sh "docker push ${DOCKER_IMAGE_FRONTEND}:latest"
                         sh "docker push ${DOCKER_IMAGE_BACKEND}:${DOCKER_TAG}"
                         sh "docker push ${DOCKER_IMAGE_BACKEND}:latest"
+                        sh "docker push ${DOCKER_IMAGE_RETRAIN}:${DOCKER_TAG}"
+                        sh "docker push ${DOCKER_IMAGE_RETRAIN}:latest"
                     }
                 }
             }
@@ -207,7 +230,8 @@ pipeline {
                     ansible-playbook -i localhost, ansible/playbook.yml \
                         --extra-vars kubeconfig_path=${KUBECONFIG_PATH} \
                         --extra-vars frontend_image_tag=${DOCKER_TAG} \
-                        --extra-vars backend_image_tag=${DOCKER_TAG}
+                        --extra-vars backend_image_tag=${DOCKER_TAG} \
+                        --extra-vars retrain_image_tag=${DOCKER_TAG}
                     """
                 }
             }

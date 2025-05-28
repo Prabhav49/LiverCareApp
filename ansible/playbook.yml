@@ -7,6 +7,7 @@
   vars:
     frontend_image_tag: "{{ frontend_image_tag | default('latest') }}"
     backend_image_tag: "{{ backend_image_tag | default('latest') }}"
+    retrain_image_tag: "{{ retrain_image_tag | default('latest') }}"  # Added retrain image tag
     kubeconfig_path: "{{ kubeconfig_path | default('./.kube/config') }}"
     manifests_dir: "{{ playbook_dir }}/../k8s-manifests"
     monitoring_dir: "{{ playbook_dir }}/../k8s-manifests/monitoring"
@@ -78,6 +79,11 @@
       register: update_backend
       when: backend_image_tag != 'latest'
 
+    - name: Update Model-Retrain Image
+      command: "kubectl set image deployment/model-retrain-deployment model-retrain-container=prabhav49/model-retrain-app:{{ retrain_image_tag }} -n {{ target_namespace }}"
+      register: update_retrain
+      when: retrain_image_tag != 'latest'
+
     - name: Rollout Restart Frontend
       command: "kubectl rollout restart deployment/frontend-deployment -n {{ target_namespace }}"
       when: frontend_image_tag == 'latest'
@@ -85,6 +91,10 @@
     - name: Rollout Restart Backend
       command: "kubectl rollout restart deployment/backend-deployment -n {{ target_namespace }}"
       when: backend_image_tag == 'latest'
+
+    - name: Rollout Restart Model-Retrain
+      command: "kubectl rollout restart deployment/model-retrain-deployment -n {{ target_namespace }}"
+      when: retrain_image_tag == 'latest'
 
     - name: Rollout Restart Prometheus
       command: "kubectl rollout restart deployment/prometheus -n {{ target_namespace }}"
@@ -111,6 +121,12 @@
       changed_when: false
       ignore_errors: yes
 
+    - name: Get Model-Retrain NodePort
+      command: "kubectl get svc model-retrain-service -n {{ target_namespace }} -o jsonpath='{.spec.ports[0].nodePort}'"
+      register: retrain_port
+      changed_when: false
+      ignore_errors: yes
+
     - name: Show access information
       debug:
         msg: |
@@ -119,9 +135,18 @@
           Or use port-forwarding: kubectl port-forward svc/frontend-service 8080:5000 -n {{ target_namespace }}
           Frontend Image Tag: {{ frontend_image_tag }}
           Backend Image Tag: {{ backend_image_tag }}
+          Model-Retrain Image Tag: {{ retrain_image_tag }}
+          
+          Model Retraining Service:
+          Model-Retrain API: http://{{ minikube_ip }}:{{ retrain_port.stdout | default('NodePort not available yet') }}
+          Health Check: http://{{ minikube_ip }}:{{ retrain_port.stdout | default('NodePort not available yet') }}/health
           
           Monitoring Stack:
           Prometheus UI: http://{{ minikube_ip }}:{{ prometheus_port.stdout | default('NodePort not available yet') }}
           Grafana UI: http://{{ minikube_ip }}:{{ grafana_port.stdout | default('NodePort not available yet') }}
           Grafana default credentials: admin/admin
+          
+          To monitor feedback data and retraining:
+          kubectl logs -f deployment/model-retrain-deployment -n {{ target_namespace }}
+          kubectl get pods -n {{ target_namespace }} -l app=model-retrain
       when: apply_result.rc == 0
