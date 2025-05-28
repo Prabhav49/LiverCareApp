@@ -8,22 +8,30 @@ data:
     global:
       scrape_interval: 15s
       evaluation_interval: 15s
-    
+
     scrape_configs:
       - job_name: 'prometheus'
         static_configs:
           - targets: ['localhost:9090']
-      
-      - job_name: 'backend'
-        metrics_path: /metrics
+
+      - job_name: 'backend-service'
         static_configs:
           - targets: ['backend-service:8000']
-      
-      - job_name: 'frontend'
-        metrics_path: /metrics
+        metrics_path: '/metrics'
+        scrape_interval: 10s
+
+      - job_name: 'frontend-service'
         static_configs:
           - targets: ['frontend-service:5000']
-      
+        metrics_path: '/metrics'
+        scrape_interval: 10s
+
+      - job_name: 'model-retrain-service'
+        static_configs:
+          - targets: ['model-retrain-service:8080']
+        metrics_path: '/metrics'
+        scrape_interval: 10s
+
       - job_name: 'kubernetes-nodes'
         kubernetes_sd_configs:
           - role: node
