@@ -4,6 +4,9 @@ from wtforms import Form, FloatField, SelectField, validators
 import re
 import os
 import time
+import json
+import csv
+from datetime import datetime
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST, REGISTRY
 
 app = Flask(__name__)
@@ -216,6 +219,75 @@ def api_predict():
         REQUESTS.labels(method=request.method, endpoint='/api/predict', status='500').inc()
         BACKEND_REQUESTS.labels(status='exception').inc()
         return jsonify({"error": str(e)}), 500
+
+@app.route('/feedback', methods=['POST'])
+def feedback():
+    start_time = time.time()
+    try:
+        data = request.json
+        feedback_type = data.get('feedback_type')
+        patient_data = data.get('patient_data')
+        prediction_result = data.get('prediction_result')
+        
+        if not feedback_type or not patient_data or not prediction_result:
+            return jsonify({"success": False, "error": "Missing required data"}), 400
+        
+        # Prepare data for storage (convert to format matching training data)
+        feedback_data = {
+            'Age of the patient': float(patient_data['age']),
+            'Gender of the patient': 'Male' if int(patient_data['gender']) == 1 else 'Female',
+            'Total Bilirubin': float(patient_data['total_bilirubin']),
+            'Direct Bilirubin': float(patient_data['direct_bilirubin']),
+            '\u00a0Alkphos Alkaline Phosphotase': float(patient_data['alkaline_phosphotase']),
+            '\u00a0Sgpt Alamine Aminotransferase': float(patient_data['alanine_aminotransferase']),
+            'Sgot Aspartate Aminotransferase': float(patient_data['aspartate_aminotransferase']),
+            'Total Protiens': float(patient_data['total_proteins']),
+            '\u00a0ALB Albumin': float(patient_data['albumin']),
+            'A/G Ratio Albumin and Globulin Ratio': float(patient_data['albumin_globulin_ratio']),
+            'feedback_type': feedback_type,
+            'prediction': prediction_result['prediction'],
+            'probability': prediction_result['probability'],
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        retrain_triggered = False
+        
+        # For correct and wrong predictions, add to training data and trigger retraining
+        if feedback_type in ['correct', 'wrong']:
+            # Determine actual result based on feedback
+            if feedback_type == 'correct':
+                actual_result = prediction_result['prediction']  # Prediction was correct
+            else:  # feedback_type == 'wrong'
+                actual_result = 1 - prediction_result['prediction']  # Prediction was wrong, so flip it
+            
+            feedback_data['Result'] = actual_result
+            
+            # Send data to model-retrain service
+            retrain_url = os.getenv('RETRAIN_SERVICE_URL', 'http://model-retrain-service:8080')
+            try:
+                retrain_response = requests.post(f'{retrain_url}/add_feedback_data', 
+                                               json=feedback_data, timeout=30)
+                if retrain_response.status_code == 200:
+                    retrain_triggered = True
+                else:
+                    print(f"Failed to trigger retraining: {retrain_response.status_code}")
+            except Exception as e:
+                print(f"Error contacting retrain service: {str(e)}")
+        
+        # Record metrics
+        process_time = time.time() - start_time
+        REQUEST_TIME.labels(endpoint='/feedback').observe(process_time)
+        REQUESTS.labels(method=request.method, endpoint='/feedback', status='200').inc()
+        
+        return jsonify({
+            "success": True, 
+            "retrain_triggered": retrain_triggered,
+            "message": f"Feedback '{feedback_type}' recorded successfully"
+        })
+        
+    except Exception as e:
+        REQUESTS.labels(method=request.method, endpoint='/feedback', status='500').inc()
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

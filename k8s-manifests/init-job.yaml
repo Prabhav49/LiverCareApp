@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: model-data-init-job
+  namespace: mlops-project
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: init-container
+        image: busybox:1.35
+        command: ['sh', '-c']
+        args:
+        - |
+          echo "Initializing training data and model directories..."
+          
+          # Create directory structure
+          mkdir -p /data/raw
+          mkdir -p /models
+          mkdir -p /shared-models
+          
+          # Copy training data if not exists
+          if [ ! -f /data/raw/Liver\ Patient\ Dataset\ \(LPD\)_train.csv ]; then
+            echo "Training data will be copied by model-retrain service on first run"
+          fi
+          
+          # Create initial directories and show completion
+          echo "Initialization completed"
+          ls -la /data/
+          ls -la /models/
+          ls -la /shared-models/
+        volumeMounts:
+        - name: training-data-volume
+          mountPath: /data
+        - name: model-storage-volume
+          mountPath: /models
+        - name: shared-model-volume
+          mountPath: /shared-models
+      volumes:
+      - name: training-data-volume
+        persistentVolumeClaim:
+          claimName: training-data-pvc
+      - name: model-storage-volume
+        persistentVolumeClaim:
+          claimName: model-storage-pvc
+      - name: shared-model-volume
+        persistentVolumeClaim:
+          claimName: shared-model-pvc

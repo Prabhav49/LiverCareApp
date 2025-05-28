@@ -25,6 +25,12 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
+        env:
+        - name: SHARED_MODEL_PATH
+          value: "/shared-models/logistic_model.pkl"
+        volumeMounts:
+        - name: shared-model-volume
+          mountPath: /shared-models
         resources:
           requests:
             cpu: 100m
@@ -44,3 +50,7 @@ spec:
             port: 8000
           initialDelaySeconds: 5
           periodSeconds: 5
+      volumes:
+      - name: shared-model-volume
+        persistentVolumeClaim:
+          claimName: shared-model-pvc

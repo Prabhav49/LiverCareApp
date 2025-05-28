@@ -4,10 +4,9 @@ import numpy as np
 import pandas as pd
 import pickle
 import os
-import threading
-import time
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import Response
+import time
 
 app = FastAPI()
 
@@ -16,63 +15,15 @@ REQUESTS = Counter('backend_requests_total', 'Total number of requests to backen
 PREDICTIONS = Counter('backend_predictions_total', 'Total number of predictions made', ['result'])
 PREDICTION_TIME = Histogram('backend_prediction_processing_seconds', 'Time spent processing prediction')
 
-# Global variables for model management
-model = None
-model_lock = threading.Lock()
-last_model_check = 0
-MODEL_CHECK_INTERVAL = 30  # Check for new model every 30 seconds
+# Load model
+try:
+    current_dir = os.path.dirname(__file__)  # /home/prabhav/SPE_Project/backend/src
+    model_path = os.path.join(current_dir, "../models/logistic_model.pkl")  # resolves correctly
+    with open(model_path, "rb") as f:
+        model = pickle.load(f)
+except Exception as e:
+    raise RuntimeError(f"Failed to load model: {str(e)}")
 
-# Model paths
-SHARED_MODEL_PATH = os.getenv('SHARED_MODEL_PATH', '/shared-models/logistic_model.pkl')
-FALLBACK_MODEL_PATH = os.path.join(os.path.dirname(__file__), "../models/logistic_model.pkl")
-
-def load_model():
-    """Load model from shared path or fallback to local path"""
-    global model
-    
-    # Try shared model path first (for updated models from retraining)
-    if os.path.exists(SHARED_MODEL_PATH):
-        try:
-            with open(SHARED_MODEL_PATH, "rb") as f:
-                model = pickle.load(f)
-            print(f"Loaded model from shared path: {SHARED_MODEL_PATH}")
-            return
-        except Exception as e:
-            print(f"Failed to load from shared path: {e}")
-    
-    # Fallback to local model
-    try:
-        with open(FALLBACK_MODEL_PATH, "rb") as f:
-            model = pickle.load(f)
-        print(f"Loaded model from fallback path: {FALLBACK_MODEL_PATH}")
-    except Exception as e:
-        raise RuntimeError(f"Failed to load model from both paths: {str(e)}")
-
-def check_for_model_updates():
-    """Check if model file has been updated and reload if necessary"""
-    global last_model_check, model
-    
-    current_time = time.time()
-    if current_time - last_model_check < MODEL_CHECK_INTERVAL:
-        return
-    
-    last_model_check = current_time
-    
-    if os.path.exists(SHARED_MODEL_PATH):
-        try:
-            # Check if file was modified recently (within last check interval + buffer)
-            file_mtime = os.path.getmtime(SHARED_MODEL_PATH)
-            if current_time - file_mtime < MODEL_CHECK_INTERVAL + 10:
-                with model_lock:
-                    with open(SHARED_MODEL_PATH, "rb") as f:
-                        new_model = pickle.load(f)
-                    model = new_model
-                    print(f"Model reloaded from shared path at {time.ctime()}")
-        except Exception as e:
-            print(f"Error checking/reloading model: {e}")
-
-# Initialize model
-load_model()
 
 class PatientData(BaseModel):
     age: float
@@ -102,8 +53,6 @@ def metrics():
 async def predict(data: PatientData):
     try:
         start_time = time.time()
-        check_for_model_updates()
-        
         input_values = [
             data.age,
             data.gender,

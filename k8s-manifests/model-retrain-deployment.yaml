@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-retrain-deployment
+  namespace: mlops-project
+  labels:
+    app: model-retrain
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: model-retrain
+  template:
+    metadata:
+      labels:
+        app: model-retrain
+    spec:
+      serviceAccountName: ml-engineer
+      containers:
+      - name: model-retrain
+        image: model-retrain:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DATA_PATH
+          value: "/data"
+        - name: MODEL_PATH
+          value: "/models"
+        - name: SHARED_MODEL_PATH
+          value: "/shared-models"
+        volumeMounts:
+        - name: training-data-volume
+          mountPath: /data
+        - name: model-storage-volume
+          mountPath: /models
+        - name: shared-model-volume
+          mountPath: /shared-models
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: training-data-volume
+        persistentVolumeClaim:
+          claimName: training-data-pvc
+      - name: model-storage-volume
+        persistentVolumeClaim:
+          claimName: model-storage-pvc
+      - name: shared-model-volume
+        persistentVolumeClaim:
+          claimName: shared-model-pvc
