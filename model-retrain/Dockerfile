@@ -9,7 +9,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY src/ ./src/
 
-# Create directories for data and models
+# Copy training data and models
+COPY data/ ./data/
+COPY models/ ./models/
+
+# Create directories for persistent volumes
 RUN mkdir -p /data/raw /models /shared-models
 
 # Expose port
