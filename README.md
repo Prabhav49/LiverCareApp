@@ -116,6 +116,45 @@ Ensure you have the following installed on your machine:
 - Ansible
 ```
 
+### 🔐 Secret Files Setup
+
+Before deploying, copy the required Kubernetes configuration and certificate files from the `important_docs` folder:
+
+```bash
+# 1. Copy Kubernetes config file to your .kube directory
+cp important_docs/kube-config.txt ~/.kube/config
+
+# 2. Copy Minikube CA certificate
+cp important_docs/minikube-ca.txt ~/.minikube/ca.crt
+
+# 3. Copy Minikube client certificate
+cp important_docs/minikube-client-cert.txt ~/.minikube/profiles/minikube/client.crt
+
+# 4. Copy Minikube client key
+cp important_docs/minikube-client-key.txt ~/.minikube/profiles/minikube/client.key
+```
+
+### ⚙️ Jenkins Variables Configuration
+
+**Important**: Update the following variables in the `Jenkinsfile` to match your environment:
+
+| **Variable** | **Current Value** | **Description** | **Required Change** |
+|--------------|-------------------|-----------------|---------------------|
+| `DOCKER_IMAGE_FRONTEND` | `prabhav49/frontend-app` | Docker Hub frontend image | Replace `prabhav49` with **your Docker Hub username** |
+| `DOCKER_IMAGE_BACKEND` | `prabhav49/backend-app` | Docker Hub backend image | Replace `prabhav49` with **your Docker Hub username** |
+| `DOCKER_IMAGE_RETRAIN` | `prabhav49/model-retrain-app` | Docker Hub retrain image | Replace `prabhav49` with **your Docker Hub username** |
+| `Git Repository URL` | `https://github.com/Prabhav49/LiverCareApp.git` | Source code repository | Replace with **your GitHub repository URL** |
+| `Email Address` | `iam49smith@gmail.com` | Notification email | Replace with **your email address** |
+| `GIT_CREDENTIALS` | `github-cred` | Jenkins credential ID | Update to **your GitHub credentials ID** |
+
+**Jenkins Credentials Required:**
+- `github-cred` - GitHub repository access
+- `docker-hub-credentials` - Docker Hub username/password
+- `kube-config` - Kubernetes config file (from important_docs)
+- `minikube-client-cert` - Client certificate file
+- `minikube-client-key` - Client key file  
+- `minikube-ca` - CA certificate file
+
 ### 1. **Environment Setup**
 
 ```bash
